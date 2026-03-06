@@ -89,6 +89,20 @@ def cmd_del(notebook: str, note_id: int) -> None:
     print(f"Удалена заметка: {notebook}/{note_id}.md")
 
 
+def cmd_edit(notebook: str, note_id: int) -> None:
+    notebooks = get_notebooks()
+    if notebook not in notebooks:
+        print(f"Ноутбук '{notebook}' не указан в notebooks.txt.", file=sys.stderr)
+        sys.exit(1)
+    folder = notebook_path(notebook)
+    path = folder / f"{note_id}.md"
+    if not path.exists():
+        print(f"Заметка {note_id} в ноутбуке '{notebook}' не найдена.", file=sys.stderr)
+        sys.exit(1)
+    editor = os.environ.get("EDITOR", "vim")
+    subprocess.run([editor, str(path)], cwd=PROJECT_ROOT)
+
+
 def cmd_move(notebook_from: str, notebook_to: str, note_id: int) -> None:
     notebooks = get_notebooks()
     if notebook_from not in notebooks or notebook_to not in notebooks:
@@ -160,6 +174,11 @@ def main():
     add_p = sub.add_parser("add", help="Создать заметку в ноутбуке")
     add_p.add_argument("notebook", help="Имя ноутбука (например project)")
     add_p.set_defaults(func=lambda a: cmd_add(a.notebook))
+
+    edit_p = sub.add_parser("edit", help="Отредактировать заметку")
+    edit_p.add_argument("notebook", help="Имя ноутбука")
+    edit_p.add_argument("note_id", type=int, help="Номер заметки")
+    edit_p.set_defaults(func=lambda a: cmd_edit(a.notebook, a.note_id))
 
     del_p = sub.add_parser("del", help="Удалить заметку")
     del_p.add_argument("notebook", help="Имя ноутбука")
