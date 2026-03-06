@@ -132,7 +132,7 @@ def cmd_list(notebook: str) -> None:
         return
     for nid, path in items:
         title = get_title(path)
-        print(f"{nid}\t{title}")
+        print(f"{nid}. {title}")
 
 
 def cmd_find(word: str) -> None:
@@ -161,10 +161,20 @@ def cmd_find(word: str) -> None:
                         context = "…" + context
                     if end < len(line):
                         context = context + "…"
-                    print(f"{notebook}/{nid}\t{title}\t{context}")
+                    print(f"{notebook}/{nid}. {title}\t{context}")
                     break
     if not found_any:
         print(f"По запросу «{word}» ничего не найдено.")
+
+
+def cmd_show() -> None:
+    script = PROJECT_ROOT / "dashboard.sh"
+    if not script.exists():
+        print("Файл dashboard.sh не найден в корне проекта.", file=sys.stderr)
+        sys.exit(1)
+    # Запускаем dashboard.sh через bash в корне проекта,
+    # чтобы не требовать execute-бит на файле
+    subprocess.run(["bash", str(script)], cwd=PROJECT_ROOT)
 
 
 def main():
@@ -174,6 +184,9 @@ def main():
     add_p = sub.add_parser("add", help="Создать заметку в ноутбуке")
     add_p.add_argument("notebook", help="Имя ноутбука (например project)")
     add_p.set_defaults(func=lambda a: cmd_add(a.notebook))
+
+    show_p = sub.add_parser("show", help="Показать дашборд заметок")
+    show_p.set_defaults(func=lambda _a: cmd_show())
 
     edit_p = sub.add_parser("edit", help="Отредактировать заметку")
     edit_p.add_argument("notebook", help="Имя ноутбука")
