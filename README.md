@@ -1,33 +1,33 @@
-# Заметочница
+# Simple notes
 
-CLI для управления заметками. Все заметки хранятся в папке проекта: каждая в своём **ноутбуке** (подпапке внутри `notes/`). Список ноутбуков задаётся в `notebooks.txt`.
+CLI to manage notes. All notes live in the project folder: each note is in its own **notebook** (subfolder inside `notes/`). The list of notebooks is defined in `notebooks.txt`.
 
-## Запуск
+## Usage
 
 ```bash
-python3 notes.py <команда> ...
+python3 notes.py <command> ...
 ```
 
-Рекомендуется алиас для короткого вызова: `alias notes='python3 /path/to/notes/notes.py'`
+It's convenient to create a short alias: `alias notes='python3 /path/to/notes/notes.py'`
 
-## Команды
+## Commands
 
-| Команда | Описание |
-|--------|----------|
-| `notes show` | Показать дашборд (`dashboard.sh`) по всем заметкам. |
-| `notes add <ноутбук>` | Создать заметку в ноутбуке. Создаётся файл `notes/<ноутбук>/N.md` (N — автоинкремент), открывается редактор (по умолчанию `macdown`, можно переопределить через переменную `EDITOR`). Первая строка — заголовок, остальное — текст. |
-| `notes edit <ноутбук> <id>` | Открыть существующую заметку в редакторе (`EDITOR`, по умолчанию `macdown`) для редактирования. |
-| `notes del <ноутбук> <id>` | Удалить заметку с номером `id` в указанном ноутбуке. |
-| `notes move <ноутбук_от> <ноутбук_до> <id>` | Переместить заметку `id` из одного ноутбука в другой (новый id назначается автоматически). |
-| `notes list <ноутбук>` | Список заметок в ноутбуке: ID и заголовок. |
-| `notes find "слово"` | Поиск по содержимому во всех ноутбуках. Вывод: ID, заголовок и окрестность вхождения. |
+| Command | Description |
+|--------|-------------|
+| `notes show` | Show dashboard (`dashboard.sh`) for all notes. |
+| `notes add <notebook>` | Create a note in a notebook. Creates file `notes/<notebook>/N.md` (N is auto‑increment), opens an editor (by default `macdown`, can be overridden via `EDITOR`). First line is the title, the rest is the body. |
+| `notes edit <notebook> <id>` | Open an existing note in the editor (`EDITOR`, default `macdown`) for editing. |
+| `notes del <notebook> <id>` | Delete note with number `id` in the given notebook. |
+| `notes move <notebook_from> <notebook_to> <id>` | Move note `id` from one notebook to another (new id assigned automatically). |
+| `notes list <notebook>` | List notes in a notebook: ID and title. |
+| `notes find "word"` | Search contents across all notebooks. Output: ID, title and a snippet around the match. |
 
-## Требования
+## Requirements
 
 - Python 3.10+
-- Для `add` и `edit`: в системе должен быть GUI/CLI‑редактор (по умолчанию используется `macdown`, можно задать `EDITOR`).
+- For `add` and `edit`: system must have a GUI/CLI editor (defaults to `macdown`, can be set via `EDITOR`).
 
-## Структура
+## Structure
 
-- `notebooks.txt` — список имён ноутбуков (по одному на строку), например `project` и `work`.
-- `notes/<ноутбук>/` — папки с заметками; файлы `1.md`, `2.md`, … (первая строка = заголовок).
+- `notebooks.txt` — list of notebook names (one per line), e.g. `project` and `work`.
+- `notes/<notebook>/` — folders with notes; files `1.md`, `2.md`, ... (first line = title).

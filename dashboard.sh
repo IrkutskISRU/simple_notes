@@ -14,11 +14,11 @@ section() {
   printf -v line '%*s' "$side_len" ''
   line=${line// /─}
 
-  # серые линии + жёлтый заголовок (sublime‑style)
+  # gray lines + yellow title (sublime‑style)
   printf '\033[38;5;240m%s \033[1;33m%s\033[38;5;240m %s\033[0m\n' "$line" "$title" "$line"
 }
 
-section "ОРГАНИЗАЦИОННЫЕ МОМЕНТЫ"
+section "ORGANIZATIONAL"
 notes list org
 
 echo ""
