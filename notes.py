@@ -70,7 +70,7 @@ def cmd_add(notebook: str) -> None:
     nid = next_id(notebook)
     path = folder / f"{nid}.md"
     path.write_text("", encoding="utf-8")
-    editor = os.environ.get("EDITOR", "vim")
+    editor = os.environ.get("EDITOR", "macdown")
     subprocess.run([editor, str(path)], cwd=PROJECT_ROOT)
     print(f"Создана заметка: {path.relative_to(PROJECT_ROOT)}")
 
@@ -99,7 +99,7 @@ def cmd_edit(notebook: str, note_id: int) -> None:
     if not path.exists():
         print(f"Заметка {note_id} в ноутбуке '{notebook}' не найдена.", file=sys.stderr)
         sys.exit(1)
-    editor = os.environ.get("EDITOR", "vim")
+    editor = os.environ.get("EDITOR", "macdown")
     subprocess.run([editor, str(path)], cwd=PROJECT_ROOT)
 
 
