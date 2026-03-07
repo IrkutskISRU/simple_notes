@@ -139,6 +139,7 @@ def cmd_find(word: str) -> None:
     notebooks = get_notebooks()
     pattern = re.compile(re.escape(word), re.IGNORECASE)
     found_any = False
+    print()
     for notebook in notebooks:
         folder = notebook_path(notebook)
         if not folder.exists():
@@ -161,7 +162,7 @@ def cmd_find(word: str) -> None:
                         context = "…" + context
                     if end < len(line):
                         context = context + "…"
-                    print(f"{notebook}/{nid}. {title}\t{context}")
+                    print(f"{notebook}/{nid}.\n{title}\n{context}\n")
                     break
     if not found_any:
         print(f"No results found for \"{word}\".")

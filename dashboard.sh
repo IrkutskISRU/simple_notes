@@ -18,7 +18,19 @@ section() {
   printf '\033[38;5;240m%s \033[1;33m%s\033[38;5;240m %s\033[0m\n' "$line" "$title" "$line"
 }
 
-section "ORGANIZATIONAL"
+section "ОРГАНИЗАЦИОННЫЕ"
 notes list org
+
+section "САЙТ"
+notes list site
+
+section "MAC OS"
+notes list mac
+
+section "РАБОТА"
+notes list work
+
+section "СПРИНТ"
+notes list agile
 
 echo ""
