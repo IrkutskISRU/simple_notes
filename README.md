@@ -21,6 +21,7 @@ It's convenient to create a short alias: `alias notes='python3 /path/to/notes/no
 | `notes move <notebook_from> <notebook_to> <id>` | Move note `id` from one notebook to another (new id assigned automatically). |
 | `notes list <notebook>` | List notes in a notebook: ID and title. |
 | `notes find "word"` | Search contents across all notebooks. Output: ID, title and a snippet around the match. |
+| `notes flist "word"` | Search contents across all notebooks. Output: notebook, ID and title of matching notes. |
 
 ## Requirements
 

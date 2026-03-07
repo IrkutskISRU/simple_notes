@@ -180,6 +180,34 @@ def cmd_find(word: str) -> None:
         print(f"No results found for \"{word}\".")
 
 
+def cmd_flist(word: str) -> None:
+    notebooks = get_notebooks()
+    pattern = re.compile(re.escape(word), re.IGNORECASE)
+    found_any = False
+    print()
+
+    for notebook in notebooks:
+        folder = notebook_path(notebook)
+        if not folder.exists():
+            continue
+
+        for path in sorted(folder.glob("*.md")):
+            if not path.stem.isdigit():
+                continue
+
+            text = path.read_text(encoding="utf-8")
+            lines = text.split("\n")
+            title = lines[0].strip() if lines else ""
+            nid = int(path.stem)
+
+            if pattern.search(text):
+                found_any = True
+                print(f"{notebook}/{nid}. {title}")
+
+    if not found_any:
+        print(f"No results found for \"{word}\".")
+
+
 def cmd_show() -> None:
     script = PROJECT_ROOT / "dashboard.sh"
     if not script.exists():
@@ -222,6 +250,11 @@ def main():
     find_p = sub.add_parser("find", help="Search note contents in all notebooks")
     find_p.add_argument("word", help="Word or phrase to search for")
     find_p.set_defaults(func=lambda a: cmd_find(a.word))
+
+    flist_p = sub.add_parser("flist", help="Search note contents and list results as IDs and titles")
+    flist_p.add_argument("word", help="Word or phrase to search for")
+    flist_p.set_defaults(func=lambda a: cmd_flist(a.word))
+
 
     args = parser.parse_args()
     args.func(args)
