@@ -17,6 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 NOTES_DIR = PROJECT_ROOT / "notes"
 NOTEBOOKS_FILE = PROJECT_ROOT / "notebooks.txt"
 
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+BLUE = '\033[94m'
+RESET = '\033[0m'
 
 def get_notebooks():
     """Read list of notebooks from notebooks.txt."""
@@ -134,36 +139,43 @@ def cmd_list(notebook: str) -> None:
         title = get_title(path)
         print(f"{nid}. {title}")
 
-
 def cmd_find(word: str) -> None:
     notebooks = get_notebooks()
     pattern = re.compile(re.escape(word), re.IGNORECASE)
     found_any = False
     print()
+
     for notebook in notebooks:
         folder = notebook_path(notebook)
         if not folder.exists():
             continue
+
         for path in sorted(folder.glob("*.md")):
             if not path.stem.isdigit():
                 continue
+
             text = path.read_text(encoding="utf-8")
             lines = text.split("\n")
             title = lines[0].strip() if lines else ""
             nid = path.stem
+
             for i, line in enumerate(lines):
                 m = pattern.search(line)
                 if m:
                     found_any = True
-                    start = max(0, m.start() - 30)
-                    end = min(len(line), m.end() + 30)
-                    context = line[start:end]
-                    if start > 0:
-                        context = "…" + context
-                    if end < len(line):
-                        context = context + "…"
-                    print(f"{notebook}/{nid}.\n{title}\n{context}\n")
+                    match_text = m.group(0)
+
+                    start_orig = max(0, m.start() - 30)
+                    end_orig = min(len(line), m.end() + 30)
+                    context_orig = line[start_orig:end_orig]
+                    highlighted_context = pattern.sub(f"{RED}\\g<0>{RESET}", context_orig)
+                    if start_orig > 0:
+                        highlighted_context = "…" + highlighted_context
+                    if end_orig < len(line):
+                        highlighted_context = highlighted_context + "…"
+                    print(f"{YELLOW}{notebook}/{nid}{RESET}.\n{BLUE}{title}{RESET}\n{GREEN}{highlighted_context}{RESET}\n")
                     break
+
     if not found_any:
         print(f"No results found for \"{word}\".")
 
