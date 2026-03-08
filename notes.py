@@ -11,6 +11,7 @@ import subprocess
 import sys
 import subprocess
 import getpass
+import shutil
 from pathlib import Path
 
 # Project root — directory where this script lives
@@ -298,23 +299,60 @@ def cmd_edit(notebook: str, note_id: int) -> None:
 
 
 
-
 def cmd_move(notebook_from: str, notebook_to: str, note_id: int) -> None:
+    print(f"Moving note {note_id} from '{notebook_from}' to '{notebook_to}'")
+
+    # Проверка блокнотов
     notebooks = get_notebooks()
-    if notebook_from not in notebooks or notebook_to not in notebooks:
-        print("Both notebooks must be listed in notebooks.txt.", file=sys.stderr)
+    if notebook_from not in notebooks:
+        print(f"ERROR: Source notebook '{notebook_from}' not in notebooks.txt", file=sys.stderr)
         sys.exit(1)
+    if notebook_to not in notebooks:
+        print(f"ERROR: Target notebook '{notebook_to}' not in notebooks.txt", file=sys.stderr)
+        sys.exit(1)
+
     folder_from = notebook_path(notebook_from)
-    path_from = folder_from / f"{note_id}.md"
-    if not path_from.exists():
-        print(f"Note {note_id} in notebook '{notebook_from}' not found.", file=sys.stderr)
-        sys.exit(1)
     folder_to = notebook_path(notebook_to)
     folder_to.mkdir(parents=True, exist_ok=True)
+
+    # Поиск исходного файла
+    source_md = folder_from / f"{note_id}.md"
+    source_enc = folder_from / f"{note_id}.enc.md"
+
+    source_path = None
+
+    if source_enc.exists():
+        source_path = source_enc
+    elif source_md.exists():
+        source_path = source_md
+    else:
+        print(f"ERROR: Note {note_id} not found in '{notebook_from}'", file=sys.stderr)
+        sys.exit(1)
+
+    # Получаем полное расширение файла
+    full_extension = ''.join(source_path.suffixes)
+    print(f"Full extension detected: {full_extension}")
+
+    # Определение целевого ID и пути
     new_id = next_id(notebook_to)
-    path_to = folder_to / f"{new_id}.md"
-    path_from.rename(path_to)
-    print(f"Moved note: {notebook_from}/{note_id}.md -> {notebook_to}/{new_id}.md")
+    target_path = folder_to / f"{new_id}{full_extension}"
+    print(f"Target path: {target_path} (ID: {new_id})")
+
+    try:
+        # Просто перемещаем файл как есть — без расшифровки
+        print(f"Moving file: {source_path} -> {target_path}")
+        shutil.move(str(source_path), str(target_path))
+
+        # Финальная проверка
+        if target_path.exists():
+            print(f"SUCCESS: Moved note: {notebook_from}/{note_id}{full_extension} -> {notebook_to}/{new_id}{full_extension}")
+        else:
+            print("ERROR: Target file was not created!", file=sys.stderr)
+            sys.exit(1)
+
+    except Exception as e:
+        print(f"ERROR during move: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_list(notebook: str) -> None:
