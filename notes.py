@@ -12,6 +12,9 @@ import sys
 import subprocess
 import getpass
 import shutil
+import zipfile
+from datetime import datetime
+
 from pathlib import Path
 
 # Project root — directory where this script lives
@@ -145,7 +148,7 @@ def get_title(path: Path) -> str:
 
     # Явная проверка на зашифрованный файл
     if path.suffix == ".enc.md":
-        return "Зашифрованная заметка"
+        return "🔒Зашифрованная заметка"
 
     try:
         content = path.read_text(encoding="utf-8")
@@ -154,11 +157,42 @@ def get_title(path: Path) -> str:
     except UnicodeDecodeError:
         # Дополнительная защита: если файл выглядит зашифрованным, но имеет .md
         if path.suffix == ".md" and path.stem.endswith(".enc"):
-            return "Зашифрованная заметка"
+            return "🔒Зашифрованная заметка"
         return "(invalid UTF-8 encoding)"
     except Exception as e:
         print(f"Error reading note title: {e}", file=sys.stderr)
         return "(error reading title)"
+
+def cmd_export() -> None:
+    """Create a ZIP archive with all notes and notebooks, named with current timestamp."""
+    if not NOTES_DIR.exists():
+        print("Notes directory not found.", file=sys.stderr)
+        sys.exit(1)
+
+    # Форматируем текущую дату и время для имени файла
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_name = f"notes_backup_{timestamp}.zip"
+    archive_path = PROJECT_ROOT / archive_name
+
+    try:
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Добавляем файл notebooks.txt
+            if NOTEBOOKS_FILE.exists():
+                zipf.write(NOTEBOOKS_FILE, NOTEBOOKS_FILE.name)
+
+            # Рекурсивно добавляем все файлы из директории notes
+            for file_path in NOTES_DIR.rglob('*'):
+                if file_path.is_file():
+                    # Сохраняем относительный путь внутри архива
+                    arcname = file_path.relative_to(PROJECT_ROOT)
+                    zipf.write(file_path, arcname)
+
+        print(f"Export successful: {archive_path.relative_to(PROJECT_ROOT)}")
+        print(f"Total files archived: {len(zipf.filelist)}")
+
+    except Exception as e:
+        print(f"Export failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_encrypt(notebook: str, note_id: int) -> None:
@@ -532,6 +566,10 @@ def main():
     encrypt_p.add_argument("notebook", help="Notebook name")
     encrypt_p.add_argument("note_id", type=int, help="Note ID")
     encrypt_p.set_defaults(func=lambda a: cmd_encrypt(a.notebook, a.note_id))
+
+    export_p = sub.add_parser("export", help="Create a ZIP archive of all notes with current timestamp")
+    export_p.set_defaults(func=lambda _a: cmd_export())
+
 
 
 
