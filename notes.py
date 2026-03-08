@@ -414,34 +414,69 @@ def cmd_find(word: str) -> None:
 
     if not found_any:
         print(f"No results found for \"{word}\".")
-
-
-def cmd_flist(word: str) -> None:
+def cmd_flist(word: str, notebook: str = None) -> None:
+    """Search note contents. If notebook is specified, search only in it and show simplified output."""
     notebooks = get_notebooks()
-    pattern = re.compile(re.escape(word), re.IGNORECASE)
-    found_any = False
-    print()
 
-    for notebook in notebooks:
+    # Если указан ноутбук, ищем только в нём
+    if notebook:
+        if notebook not in notebooks:
+            print(f"Notebook '{notebook}' is not listed in notebooks.txt.", file=sys.stderr)
+            sys.exit(1)
+
         folder = notebook_path(notebook)
         if not folder.exists():
-            continue
+            print(f"No notes in notebook '{notebook}'.")
+            return
+
+        pattern = re.compile(re.escape(word), re.IGNORECASE)
+        found_any = False
 
         for path in sorted(folder.glob("*.md")):
             if not path.stem.isdigit():
                 continue
 
-            text = path.read_text(encoding="utf-8")
-            lines = text.split("\n")
-            title = lines[0].strip() if lines else ""
-            nid = int(path.stem)
+            try:
+                text = path.read_text(encoding="utf-8")
+                lines = text.split("\n")
+                title = lines[0].strip() if lines else ""
+                nid = int(path.stem)
 
-            if pattern.search(text):
-                found_any = True
-                print(f"{notebook}/{nid}. {title}")
+                if pattern.search(text):
+                    found_any = True
+                    print(f"{nid}. {title}")
+            except Exception as e:
+                print(f"Error reading {path}: {e}", file=sys.stderr)
 
-    if not found_any:
-        print(f"No results found for \"{word}\".")
+        if not found_any:
+            print(f"No results found for \"{word}\" in notebook '{notebook}'.")
+
+    # Глобальный поиск по всем ноутбукам (старый функционал)
+    else:
+        pattern = re.compile(re.escape(word), re.IGNORECASE)
+        found_any = False
+        print()
+
+        for notebook_name in notebooks:
+            folder = notebook_path(notebook_name)
+            if not folder.exists():
+                continue
+
+            for path in sorted(folder.glob("*.md")):
+                if not path.stem.isdigit():
+                    continue
+
+                text = path.read_text(encoding="utf-8")
+                lines = text.split("\n")
+                title = lines[0].strip() if lines else ""
+                nid = int(path.stem)
+
+                if pattern.search(text):
+                    found_any = True
+                    print(f"{notebook_name}/{nid}. {title}")
+
+        if not found_any:
+            print(f"No results found for \"{word}\".")
 
 
 def cmd_show() -> None:
@@ -487,9 +522,11 @@ def main():
     find_p.add_argument("word", help="Word or phrase to search for")
     find_p.set_defaults(func=lambda a: cmd_find(a.word))
 
-    flist_p = sub.add_parser("flist", help="Search note contents and list results as IDs and titles")
+    flist_p = sub.add_parser("flist", help="Search note contents (all notebooks or specific notebook)")
     flist_p.add_argument("word", help="Word or phrase to search for")
-    flist_p.set_defaults(func=lambda a: cmd_flist(a.word))
+    flist_p.add_argument("--notebook", "-n", help="Optional: notebook to search in (simplified output)")
+    flist_p.set_defaults(func=lambda a: cmd_flist(a.word, a.notebook))
+
 
     encrypt_p = sub.add_parser("encrypt", help="Encrypt a note with password using OpenSSL")
     encrypt_p.add_argument("notebook", help="Notebook name")
