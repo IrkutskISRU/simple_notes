@@ -22,6 +22,9 @@ It's convenient to create a short alias: `alias notes='python3 /path/to/notes/no
 | `notes list <notebook>` | List notes in a notebook: ID and title. |
 | `notes find "word"` | Search contents across all notebooks. Output: ID, title and a snippet around the match. |
 | `notes flist "word"` | Search contents across all notebooks. Output: notebook, ID and title of matching notes. |
+| `notes flist "word" --notebook <notebook>` | Search contents within a **specific notebook**. Output is simplified: ID and title of matching notes in the specified notebook. |
+| `notes encrypt <notebook> <id>` | Encrypt a note using OpenSSL (AES‑256‑CBC). Prompts for and confirms a password. Removes the original `.md` file after successful encryption, creates a `.enc.md` file. |
+| `notes export` | Create a ZIP archive of all notes and the `notebooks.txt` file. Archive name includes a timestamp: `notes_backup_YYYYMMDD_HHMMSS.zip`. |
 
 ## Requirements
 
