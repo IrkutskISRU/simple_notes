@@ -9,8 +9,9 @@ import os
 import re
 import subprocess
 import sys
+import subprocess
+import getpass
 from pathlib import Path
-
 
 # Project root — directory where this script lives
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -22,6 +23,82 @@ GREEN = '\033[92m'
 YELLOW = '\033[93m'
 BLUE = '\033[94m'
 RESET = '\033[0m'
+
+# Global password cache (cleared when script exits)
+PASSWORD_CACHE = {}
+
+def get_cached_password(file_key: str, prompt: str) -> str:
+    """Get password from cache or prompt user."""
+    if file_key in PASSWORD_CACHE:
+        return PASSWORD_CACHE[file_key]
+
+    password = getpass.getpass(prompt)
+    PASSWORD_CACHE[file_key] = password
+    return password
+
+def encrypt_file(input_path: Path, output_path: Path, password: str) -> bool:
+    """Encrypt file using OpenSSL (AES-256-CBC) with password from parameter."""
+    try:
+        cmd = [
+            "openssl", "enc", "-aes-256-cbc",
+            "-e", "-in", str(input_path),
+            "-out", str(output_path),
+            "-pass", f"pass:{password}",
+            "-md", "sha256",
+            "-pbkdf2"  # Используем PBKDF2 для лучшей совместимости
+        ]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print(f"Encryption failed: {result.stderr}", file=sys.stderr)
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"Encryption error: {e}", file=sys.stderr)
+        return False
+
+def decrypt_file(input_path: Path, output_path: Path, password: str) -> bool:
+    """Decrypt file using OpenSSL with password from parameter."""
+    try:
+        cmd = [
+            "openssl", "enc", "-aes-256-cbc",
+            "-d", "-in", str(input_path),
+            "-out", str(output_path),
+            "-pass", f"pass:{password}",
+            "-md", "sha256",
+            "-pbkdf2"  # Тот же PBKDF2 для совместимости
+        ]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print("Decryption failed (wrong password or corrupted file).", file=sys.stderr)
+            return False
+
+        # Дополнительная проверка: читаем расшифрованный файл как UTF-8
+        try:
+            output_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            print("Decrypted file is not valid UTF-8. Possible decryption error.", file=sys.stderr)
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"Decryption error: {e}", file=sys.stderr)
+        return False
+
 
 def get_notebooks():
     """Read list of notebooks from notebooks.txt."""
@@ -35,17 +112,23 @@ def get_notebooks():
 def notebook_path(notebook: str) -> Path:
     return NOTES_DIR / notebook
 
-
 def list_note_files(notebook: str) -> list[tuple[int, Path]]:
-    """Return list of (id, path) for all .md files in a notebook, sorted by id."""
+    """Return list of (id, path) for all .md and .enc.md files in a notebook, sorted by id."""
     folder = notebook_path(notebook)
     if not folder.exists():
         return []
+
     ids_and_paths = []
     for f in folder.iterdir():
-        if f.suffix == ".md" and f.name[:-3].isdigit():
-            ids_and_paths.append((int(f.stem), f))
+        if f.is_file() and f.suffix in [".md", ".enc.md"]:
+            name = f.stem
+            if name.endswith(".enc"):
+                name = name[:-4]
+            if name.isdigit():
+                ids_and_paths.append((int(name), f))
     return sorted(ids_and_paths)
+
+
 
 
 def next_id(notebook: str) -> int:
@@ -55,14 +138,62 @@ def next_id(notebook: str) -> int:
         return 1
     return max(id_ for id_, _ in existing) + 1
 
-
 def get_title(path: Path) -> str:
-    """First line of the file is the title."""
     if not path.exists():
         return "(no title)"
-    text = path.read_text(encoding="utf-8")
-    first = text.split("\n")[0].strip()
-    return first or "(empty title)"
+
+    # Явная проверка на зашифрованный файл
+    if path.suffix == ".enc.md":
+        return "Зашифрованная заметка"
+
+    try:
+        content = path.read_text(encoding="utf-8")
+        first = content.split("\n")[0].strip()
+        return first or "(empty title)"
+    except UnicodeDecodeError:
+        # Дополнительная защита: если файл выглядит зашифрованным, но имеет .md
+        if path.suffix == ".md" and path.stem.endswith(".enc"):
+            return "Зашифрованная заметка"
+        return "(invalid UTF-8 encoding)"
+    except Exception as e:
+        print(f"Error reading note title: {e}", file=sys.stderr)
+        return "(error reading title)"
+
+
+def cmd_encrypt(notebook: str, note_id: int) -> None:
+    """Encrypt a note using OpenSSL with password confirmation."""
+    notebooks = get_notebooks()
+    if notebook not in notebooks:
+        print(f"Notebook '{notebook}' is not listed in notebooks.txt.", file=sys.stderr)
+        sys.exit(1)
+
+    folder = notebook_path(notebook)
+    original_path = folder / f"{note_id}.md"
+    encrypted_path = folder / f"{note_id}.enc.md"  # .enc.md extension for encrypted files
+
+    if not original_path.exists():
+        print(f"Note {note_id} in notebook '{notebook}' not found.", file=sys.stderr)
+        sys.exit(1)
+
+    # Запрос пароля и его подтверждения
+    while True:
+        password1 = getpass.getpass(f"Enter password to encrypt {notebook}/{note_id}: ")
+        password2 = getpass.getpass("Confirm password: ")
+
+        if password1 == password2:
+            break
+        else:
+            print("Passwords do not match. Please try again.")
+
+    # Шифрование файла с передачей пароля
+    if encrypt_file(original_path, encrypted_path, password1):
+        # Удаление исходного файла после успешного шифрования
+        original_path.unlink()
+        print(f"Encrypted note: {notebook}/{note_id}.md -> {notebook}/{note_id}.enc.md")
+    else:
+        print("Encryption failed, original file preserved.", file=sys.stderr)
+        sys.exit(1)
+
 
 
 def cmd_add(notebook: str) -> None:
@@ -85,13 +216,26 @@ def cmd_del(notebook: str, note_id: int) -> None:
     if notebook not in notebooks:
         print(f"Notebook '{notebook}' is not listed in notebooks.txt.", file=sys.stderr)
         sys.exit(1)
+
     folder = notebook_path(notebook)
-    path = folder / f"{note_id}.md"
-    if not path.exists():
+    # Ищем файл с любым расширением
+    possible_paths = [
+        folder / f"{note_id}.md",
+        folder / f"{note_id}.enc.md"
+    ]
+
+    target_path = None
+    for path in possible_paths:
+        if path.exists():
+            target_path = path
+            break
+
+    if target_path is None:
         print(f"Note {note_id} in notebook '{notebook}' not found.", file=sys.stderr)
         sys.exit(1)
-    path.unlink()
-    print(f"Deleted note: {notebook}/{note_id}.md")
+
+    target_path.unlink()
+    print(f"Deleted note: {target_path.relative_to(PROJECT_ROOT)}")
 
 
 def cmd_edit(notebook: str, note_id: int) -> None:
@@ -99,13 +243,60 @@ def cmd_edit(notebook: str, note_id: int) -> None:
     if notebook not in notebooks:
         print(f"Notebook '{notebook}' is not listed in notebooks.txt.", file=sys.stderr)
         sys.exit(1)
+
     folder = notebook_path(notebook)
-    path = folder / f"{note_id}.md"
-    if not path.exists():
-        print(f"Note {note_id} in notebook '{notebook}' not found.", file=sys.stderr)
+    encrypted_path = folder / f"{note_id}.enc.md"
+    is_encrypted = encrypted_path.exists()
+
+    temp_path = None
+    password = None
+
+    try:
+        if is_encrypted:
+            file_key = str(encrypted_path)
+            password = get_cached_password(file_key, f"Enter password for {notebook}/{note_id}: ")
+
+            # Создаём временный расшифрованный файл
+            temp_path = folder / f"temp_{note_id}.md"
+            if not decrypt_file(encrypted_path, temp_path, password):
+                print("Failed to decrypt note for editing.", file=sys.stderr)
+                sys.exit(1)
+            path_to_edit = temp_path
+            editor = "vim"  # Используем Vim для зашифрованных заметок
+        else:
+            path_to_edit = folder / f"{note_id}.md"
+            if not path_to_edit.exists():
+                print(f"Note {note_id} in notebook '{notebook}' not found.", file=sys.stderr)
+                sys.exit(1)
+            editor = "macdown"  # Используем MacDown для обычных заметок
+
+        # Открываем редактор и ждём завершения
+        result = subprocess.run([editor, str(path_to_edit)], cwd=PROJECT_ROOT)
+
+        if result.returncode != 0:
+            print("Editor exited with error.", file=sys.stderr)
+            raise Exception("Editor error")
+
+        if is_encrypted:
+            # Перешифровываем после редактирования
+            if not encrypt_file(temp_path, encrypted_path, password):
+                print("Failed to re-encrypt file after editing.", file=sys.stderr)
+                raise Exception("Encryption failed")
+
+            # Удаляем временный файл только после успешного шифрования
+            if temp_path and temp_path.exists():
+                temp_path.unlink()
+                print(f"Temporary file {temp_path} removed.")
+
+    except Exception as e:
+        # В случае ошибки оставляем временный файл для отладки
+        if temp_path and temp_path.exists():
+            print(f"Temporary file preserved for debugging: {temp_path}")
         sys.exit(1)
-    editor = os.environ.get("EDITOR", "macdown")
-    subprocess.run([editor, str(path)], cwd=PROJECT_ROOT)
+
+    print(f"Edited note: {notebook}/{note_id}.md")
+
+
 
 
 def cmd_move(notebook_from: str, notebook_to: str, note_id: int) -> None:
@@ -131,13 +322,20 @@ def cmd_list(notebook: str) -> None:
     if notebook not in notebooks:
         print(f"Notebook '{notebook}' is not listed in notebooks.txt.", file=sys.stderr)
         sys.exit(1)
+
     items = list_note_files(notebook)
     if not items:
         print(f"No notes in notebook '{notebook}'.")
         return
+
     for nid, path in items:
-        title = get_title(path)
-        print(f"{nid}. {title}")
+        try:
+            title = get_title(path)  # Использует обновлённую функцию
+            print(f"{nid}. {title}")
+        except Exception as e:
+            print(f"{nid}. (error reading note: {e})")
+
+
 
 def cmd_find(word: str) -> None:
     notebooks = get_notebooks()
@@ -254,6 +452,12 @@ def main():
     flist_p = sub.add_parser("flist", help="Search note contents and list results as IDs and titles")
     flist_p.add_argument("word", help="Word or phrase to search for")
     flist_p.set_defaults(func=lambda a: cmd_flist(a.word))
+
+    encrypt_p = sub.add_parser("encrypt", help="Encrypt a note with password using OpenSSL")
+    encrypt_p.add_argument("notebook", help="Notebook name")
+    encrypt_p.add_argument("note_id", type=int, help="Note ID")
+    encrypt_p.set_defaults(func=lambda a: cmd_encrypt(a.notebook, a.note_id))
+
 
 
     args = parser.parse_args()
