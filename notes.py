@@ -49,7 +49,7 @@ def encrypt_file(input_path: Path, output_path: Path, password: str) -> bool:
             "-out", str(output_path),
             "-pass", f"pass:{password}",
             "-md", "sha256",
-            "-pbkdf2"  # Используем PBKDF2 для лучшей совместимости
+            "-pbkdf2"  # Use PBKDF2 for better compatibility
         ]
 
         result = subprocess.run(
@@ -77,7 +77,7 @@ def decrypt_file(input_path: Path, output_path: Path, password: str) -> bool:
             "-out", str(output_path),
             "-pass", f"pass:{password}",
             "-md", "sha256",
-            "-pbkdf2"  # Тот же PBKDF2 для совместимости
+            "-pbkdf2"  # Use the same PBKDF2 for compatibility
         ]
 
         result = subprocess.run(
@@ -90,7 +90,7 @@ def decrypt_file(input_path: Path, output_path: Path, password: str) -> bool:
             print("Decryption failed (wrong password or corrupted file).", file=sys.stderr)
             return False
 
-        # Дополнительная проверка: читаем расшифрованный файл как UTF-8
+        # Extra validation: read decrypted file as UTF-8
         try:
             output_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -146,18 +146,18 @@ def get_title(path: Path) -> str:
     if not path.exists():
         return "(no title)"
 
-    # Явная проверка на зашифрованный файл
+    # Explicit check for encrypted file
     if path.suffix == ".enc.md":
-        return "🔒Зашифрованная заметка"
+        return "🔒Encrypted note"
 
     try:
         content = path.read_text(encoding="utf-8")
         first = content.split("\n")[0].strip()
         return first or "(empty title)"
     except UnicodeDecodeError:
-        # Дополнительная защита: если файл выглядит зашифрованным, но имеет .md
+        # Extra guard: if the file looks encrypted but has .md extension
         if path.suffix == ".md" and path.stem.endswith(".enc"):
-            return "🔒Зашифрованная заметка"
+            return "🔒Encrypted note"
         return "(invalid UTF-8 encoding)"
     except Exception as e:
         print(f"Error reading note title: {e}", file=sys.stderr)
@@ -169,21 +169,21 @@ def cmd_export() -> None:
         print("Notes directory not found.", file=sys.stderr)
         sys.exit(1)
 
-    # Форматируем текущую дату и время для имени файла
+    # Format current date and time for archive filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive_name = f"notes_backup_{timestamp}.zip"
     archive_path = PROJECT_ROOT / archive_name
 
     try:
         with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Добавляем файл notebooks.txt
+            # Add notebooks.txt
             if NOTEBOOKS_FILE.exists():
                 zipf.write(NOTEBOOKS_FILE, NOTEBOOKS_FILE.name)
 
-            # Рекурсивно добавляем все файлы из директории notes
+            # Recursively add all files from notes directory
             for file_path in NOTES_DIR.rglob('*'):
                 if file_path.is_file():
-                    # Сохраняем относительный путь внутри архива
+                    # Preserve relative path inside archive
                     arcname = file_path.relative_to(PROJECT_ROOT)
                     zipf.write(file_path, arcname)
 
@@ -210,7 +210,7 @@ def cmd_encrypt(notebook: str, note_id: int) -> None:
         print(f"Note {note_id} in notebook '{notebook}' not found.", file=sys.stderr)
         sys.exit(1)
 
-    # Запрос пароля и его подтверждения
+    # Prompt for password and confirmation
     while True:
         password1 = getpass.getpass(f"Enter password to encrypt {notebook}/{note_id}: ")
         password2 = getpass.getpass("Confirm password: ")
@@ -220,9 +220,9 @@ def cmd_encrypt(notebook: str, note_id: int) -> None:
         else:
             print("Passwords do not match. Please try again.")
 
-    # Шифрование файла с передачей пароля
+    # Encrypt file with provided password
     if encrypt_file(original_path, encrypted_path, password1):
-        # Удаление исходного файла после успешного шифрования
+        # Remove original file after successful encryption
         original_path.unlink()
         print(f"Encrypted note: {notebook}/{note_id}.md -> {notebook}/{note_id}.enc.md")
     else:
@@ -253,7 +253,7 @@ def cmd_del(notebook: str, note_id: int) -> None:
         sys.exit(1)
 
     folder = notebook_path(notebook)
-    # Ищем файл с любым расширением
+    # Search for note file with any supported extension
     possible_paths = [
         folder / f"{note_id}.md",
         folder / f"{note_id}.enc.md"
@@ -291,21 +291,21 @@ def cmd_edit(notebook: str, note_id: int) -> None:
             file_key = str(encrypted_path)
             password = get_cached_password(file_key, f"Enter password for {notebook}/{note_id}: ")
 
-            # Создаём временный расшифрованный файл
+            # Create temporary decrypted file
             temp_path = folder / f"temp_{note_id}.md"
             if not decrypt_file(encrypted_path, temp_path, password):
                 print("Failed to decrypt note for editing.", file=sys.stderr)
                 sys.exit(1)
             path_to_edit = temp_path
-            editor = "vim"  # Используем Vim для зашифрованных заметок
+            editor = "vim"  # Use Vim for encrypted notes
         else:
             path_to_edit = folder / f"{note_id}.md"
             if not path_to_edit.exists():
                 print(f"Note {note_id} in notebook '{notebook}' not found.", file=sys.stderr)
                 sys.exit(1)
-            editor = "macdown"  # Используем MacDown для обычных заметок
+            editor = "macdown"  # Use MacDown for regular notes
 
-        # Открываем редактор и ждём завершения
+        # Open editor and wait for it to exit
         result = subprocess.run([editor, str(path_to_edit)], cwd=PROJECT_ROOT)
 
         if result.returncode != 0:
@@ -313,18 +313,18 @@ def cmd_edit(notebook: str, note_id: int) -> None:
             raise Exception("Editor error")
 
         if is_encrypted:
-            # Перешифровываем после редактирования
+            # Re-encrypt after editing
             if not encrypt_file(temp_path, encrypted_path, password):
                 print("Failed to re-encrypt file after editing.", file=sys.stderr)
                 raise Exception("Encryption failed")
 
-            # Удаляем временный файл только после успешного шифрования
+            # Remove temporary file only after successful encryption
             if temp_path and temp_path.exists():
                 temp_path.unlink()
                 print(f"Temporary file {temp_path} removed.")
 
     except Exception as e:
-        # В случае ошибки оставляем временный файл для отладки
+        # Keep temporary file for debugging if an error occurs
         if temp_path and temp_path.exists():
             print(f"Temporary file preserved for debugging: {temp_path}")
         sys.exit(1)
@@ -336,7 +336,7 @@ def cmd_edit(notebook: str, note_id: int) -> None:
 def cmd_move(notebook_from: str, notebook_to: str, note_id: int) -> None:
     print(f"Moving note {note_id} from '{notebook_from}' to '{notebook_to}'")
 
-    # Проверка блокнотов
+    # Validate notebooks
     notebooks = get_notebooks()
     if notebook_from not in notebooks:
         print(f"ERROR: Source notebook '{notebook_from}' not in notebooks.txt", file=sys.stderr)
@@ -349,7 +349,7 @@ def cmd_move(notebook_from: str, notebook_to: str, note_id: int) -> None:
     folder_to = notebook_path(notebook_to)
     folder_to.mkdir(parents=True, exist_ok=True)
 
-    # Поиск исходного файла
+    # Locate source file
     source_md = folder_from / f"{note_id}.md"
     source_enc = folder_from / f"{note_id}.enc.md"
 
@@ -363,21 +363,21 @@ def cmd_move(notebook_from: str, notebook_to: str, note_id: int) -> None:
         print(f"ERROR: Note {note_id} not found in '{notebook_from}'", file=sys.stderr)
         sys.exit(1)
 
-    # Получаем полное расширение файла
+    # Get full file extension
     full_extension = ''.join(source_path.suffixes)
     print(f"Full extension detected: {full_extension}")
 
-    # Определение целевого ID и пути
+    # Determine target ID and path
     new_id = next_id(notebook_to)
     target_path = folder_to / f"{new_id}{full_extension}"
     print(f"Target path: {target_path} (ID: {new_id})")
 
     try:
-        # Просто перемещаем файл как есть — без расшифровки
+        # Move file as-is, without decryption
         print(f"Moving file: {source_path} -> {target_path}")
         shutil.move(str(source_path), str(target_path))
 
-        # Финальная проверка
+        # Final verification
         if target_path.exists():
             print(f"SUCCESS: Moved note: {notebook_from}/{note_id}{full_extension} -> {notebook_to}/{new_id}{full_extension}")
         else:
@@ -402,7 +402,7 @@ def cmd_list(notebook: str) -> None:
 
     for nid, path in items:
         try:
-            title = get_title(path)  # Использует обновлённую функцию
+            title = get_title(path)  # Uses updated function
             print(f"{nid}. {title}")
         except Exception as e:
             print(f"{nid}. (error reading note: {e})")
@@ -452,7 +452,7 @@ def cmd_flist(word: str, notebook: str = None) -> None:
     """Search note contents. If notebook is specified, search only in it and show simplified output."""
     notebooks = get_notebooks()
 
-    # Если указан ноутбук, ищем только в нём
+    # If notebook is specified, search only in it
     if notebook:
         if notebook not in notebooks:
             print(f"Notebook '{notebook}' is not listed in notebooks.txt.", file=sys.stderr)
@@ -485,7 +485,7 @@ def cmd_flist(word: str, notebook: str = None) -> None:
         if not found_any:
             print(f"No results found for \"{word}\" in notebook '{notebook}'.")
 
-    # Глобальный поиск по всем ноутбукам (старый функционал)
+    # Global search across all notebooks (legacy behavior)
     else:
         pattern = re.compile(re.escape(word), re.IGNORECASE)
         found_any = False
