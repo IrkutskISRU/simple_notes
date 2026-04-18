@@ -1,7 +1,0 @@
-org
-site
-hints
-mac
-work
-agile
-projects

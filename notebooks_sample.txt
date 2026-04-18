@@ -1,0 +1,4 @@
+work
+books
+health
+study
